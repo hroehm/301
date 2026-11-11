@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Byte Blitz: Digital Edition</title>
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --neon-green: #39ff14;
+            --neon-blue: #00ffff;
+            --neon-red: #ff003c;
+            --neon-gold: #ffd700;
+            --text-main: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(rgba(0, 255, 0, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 0, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* CRT Scanline Effect */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        header {
+            text-align: center;
+            padding: 10px;
+            z-index: 3;
+            width: 100%;
+            border-bottom: 2px solid var(--neon-green);
+            background: rgba(0,0,0,0.8);
+        }
+
+        h1 {
+            color: var(--neon-green);
+            text-transform: uppercase;
+            text-shadow: 0 0 10px var(--neon-green);
+            font-size: 1.5rem;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 600px;
+            margin: 10px auto 0;
+            font-weight: bold;
+            color: var(--neon-gold);
+            text-shadow: 0 0 5px var(--neon-gold);
+        }
+
+        #game-board {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            width: 100%;
+            max-width: 800px;
+            padding: 10px;
+            z-index: 3;
+        }
+
+        .table-center {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 2px dashed #333;
+            border-radius: 10px;
+            margin: 10px 0;
+            position: relative;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+        }
+
+        .tokens-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .token {
+            width: 40px;
+            height: 40px;
+            background: var(--neon-gold);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--neon-gold);
+            transition: transform 0.2s;
+        }
+
+        #status-display {
+            font-size: 1.2rem;
+            text-align: center;
+            height: 30px;
+            color: var(--neon-red);
+            text-shadow: 0 0 8px var(--neon-red);
+            font-weight: bold;
+        }
+
+        .player-area {
+            display: grid;
+            grid-template-columns: 1fr 3fr;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid #444;
+        }
+
+        .incoming-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-right: 2px solid #444;
+            padding-right: 10px;
+        }
+
+        .hand-zone {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .card {
+            width: 70px;
+            height: 100px;
+            background: #111;
+            border: 3px solid;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card .base-label {
+            position: absolute;
+            top: 5px;
+            font-size: 0.6rem;
+            opacity: 0.7;
+        }
+
+        .card .value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            word-break: break-all;
+            text-align: center;
+            padding: 0 5px;
+        }
+
+        .card.bin { border-color: var(--neon-blue); box-shadow: 0 0 10px rgba(0,255,255,0.3); color: var(--neon-blue); }
+        .card.hex { border-color: var(--neon-red); box-shadow: 0 0 10px rgba(255,0,60,0.3); color: var(--neon-red); }
+        .card.dec { border-color: var(--neon-green); box-shadow: 0 0 10px rgba(57,255,20,0.3); color: var(--neon-green); }
+
+        .btn {
+            background: #222;
+            color: var(--text-main);
+            border: 2px solid var(--text-main);
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .btn:active { transform: scale(0.95); }
+
+        #btn-pass {
+            margin-top: 10px;
+            border-color: #888;
+            color: #888;
+        }
+
+        #btn-grab {
+            position: absolute;
+            font-size: 2rem;
+            padding: 20px 40px;
+            background: var(--neon-red);
+            color: white;
+            border: 4px solid white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px var(--neon-red);
+            display: none;
+            z-index: 10;
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+        }
+
+        .scramble-flash {
+            animation: bgFlash 0.5s infinite;
+        }
+
+        @keyframes bgFlash {
+            0% { background-color: var(--bg); }
+            50% { background-color: #300; }
+            100% { background-color: var(--bg); }
+        }
+
+        /* Instructions Modal */
+        #instructions-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 12, 0.95);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .instructions-content {
+            max-width: 600px;
+            background: #111;
+            border: 2px solid var(--neon-blue);
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            text-align: center;
+        }
+
+        .instructions-content h2 {
+            color: var(--neon-blue);
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        .instructions-content p, .instructions-content ul {
+            margin-bottom: 15px;
+            text-align: left;
+            line-height: 1.6;
+        }
+
+        .instructions-content ul {
+            padding-left: 20px;
+        }
+
+        .instructions-content li {
+            margin-bottom: 10px;
+        }
+
+        .instructions-content .highlight {
+            color: var(--neon-gold);
+            font-weight: bold;
+        }
+
+        /* Responsive scaling */
+        @media (min-width: 600px) {
+            .card { width: 90px; height: 130px; }
+            .card .value { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions-modal">
+        <div class="instructions-content">
+            <h2>SYSTEM DIRECTIVE</h2>
+            <p>Welcome to Byte Blitz. Your objective is rapid base conversion.</p>
+            <ul>
+                <li><strong>MATCH:</strong> Build a hand with 3 equivalent values (1 <span style="color:var(--neon-blue)">BIN</span>, 1 <span style="color:var(--neon-red)">HEX</span>, 1 <span style="color:var(--neon-green)">DEC</span>).</li>
+                <li><strong>PASS:</strong> Click a card in your hand to swap it with the incoming card, or click "PASS ➔" to draw a new one.</li>
+                <li><strong>SCRAMBLE:</strong> When anyone (you or a simulated bot) gets a match, an alarm sounds! Quickly hit <span class="highlight">GRAB TOKEN!</span> before the bots take them all.</li>
+                <li><strong>SURVIVE:</strong> There is always one less token than players. If you miss a token, you get a strike (H-E-X). 3 strikes = FATAL ERROR.</li>
+            </ul>
+            <button id="btn-start" class="btn" style="border-color: var(--neon-blue); color: var(--neon-blue); margin-top: 20px;">INITIALIZE GAME</button>
+        </div>
+    </div>
+
+    <header>
+        <h1>Byte Blitz</h1>
+        <div class="stats-bar">
+            <span>STRIKES: <span id="strikes-ui">___</span></span>
+            <span>ROUND: <span id="round-ui">1</span></span>
+        </div>
+    </header>
+
+    <div id="game-board">
+        <div class="table-center" id="table">
+            <div class="tokens-container" id="tokens-container">
+                <!-- Tokens injected here -->
+            </div>
+            <div id="status-display">WAITING FOR MATCH...</div>
+            <button id="btn-grab" class="btn">GRAB TOKEN!</button>
+        </div>
+
+        <div class="player-area">
+            <div class="incoming-zone">
+                <div style="font-size: 0.8rem; margin-bottom: 5px; color: #888;">INCOMING</div>
+                <div id="incoming-card-slot"></div>
+                <button id="btn-pass" class="btn">PASS ➔</button>
+            </div>
+            
+            <div class="hand-zone">
+                <div id="hand-slot-0"></div>
+                <div id="hand-slot-1"></div>
+                <div id="hand-slot-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Web Audio Synthesizer setup for retro sound effects
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            if (type === 'pass') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'scramble') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'strike') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+            } else if (type === 'safe') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(660, audioCtx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+            }
+        }
+
+        // Game State
+        const TOTAL_PLAYERS = 4; // 1 Human, 3 Bots
+        let deck = [];
+        let hand = [];
+        let incomingCard = null;
+        let tokensLeft = 0;
+        let strikes = 0;
+        let round = 1;
+        let gameState = 'playing'; // playing, scramble, resolution
+        let botTimers = [];
+
+        const DOM = {
+            incoming: document.getElementById('incoming-card-slot'),
+            hand: [
+                document.getElementById('hand-slot-0'),
+                document.getElementById('hand-slot-1'),
+                document.getElementById('hand-slot-2')
+            ],
+            tokens: document.getElementById('tokens-container'),
+            status: document.getElementById('status-display'),
+            btnGrab: document.getElementById('btn-grab'),
+            btnPass: document.getElementById('btn-pass'),
+            strikes: document.getElementById('strikes-ui'),
+            round: document.getElementById('round-ui'),
+            table: document.getElementById('table')
+        };
+
+        function generateDeck() {
+            deck = [];
+            // Generate 20 sets of numbers across difficulty tiers (easy nibbles to full bytes)
+            const targetNumbers = Array.from({length: 20}, () => Math.floor(Math.random() * 240) + 10);
+            
+            targetNumbers.forEach(num => {
+                deck.push({ type: 'bin', val: num.toString(2), num: num, label: 'BIN' });
+                deck.push({ type: 'hex', val: num.toString(16).toUpperCase(), num: num, label: 'HEX' });
+                deck.push({ type: 'dec', val: num.toString(10), num: num, label: 'DEC' });
+            });
+            // Shuffle
+            deck = deck.sort(() => Math.random() - 0.5);
+        }
+
+        function getCard() {
+            if (deck.length === 0) generateDeck();
+            return deck.pop();
+        }
+
+        function createCardHTML(card, index, isIncoming = false) {
+            if (!card) return `<div class="card" style="background: transparent; border-color: #333;"></div>`;
+            return `
+                <div class="card ${card.type}" onclick="handleCardClick(${isIncoming ? -1 : index})">
+                    <span class="base-label">${card.label}</span>
+                    <span class="value">${card.val}</span>
+                </div>
+            `;
+        }
+
+        function updateUI() {
+            DOM.incoming.innerHTML = createCardHTML(incomingCard, -1, true);
+            hand.forEach((card, i) => {
+                DOM.hand[i].innerHTML = createCardHTML(card, i);
+            });
+            
+            DOM.tokens.innerHTML = '';
+            for(let i=0; i<tokensLeft; i++) {
+                DOM.tokens.innerHTML += `<div class="token"></div>`;
+            }
+            DOM.round.innerText = round;
+            
+            let strikeStr = "";
+            const strikeChars = ["H", "E", "X"];
+            for(let i=0; i<3; i++) strikeStr += (i < strikes) ? strikeChars[i] : "_";
+            DOM.strikes.innerText = strikeStr;
+        }
+
+        function handleCardClick(index) {
+            if (gameState !== 'playing') return;
+            initAudio(); // Required to unlock audio on first interaction
+            
+            if (index >= 0) {
+                // Swap clicked hand card with incoming card
+                let temp = hand[index];
+                hand[index] = incomingCard;
+                incomingCard = getCard();
+                playSound('pass');
+            }
+            updateUI();
+            checkPlayerMatch();
+        }
+
+        DOM.btnPass.addEventListener('click', () => {
+            if (gameState !== 'playing') return;
+            initAudio();
+            incomingCard = getCard();
+            playSound('pass');
+            updateUI();
+        });
+
+        function checkPlayerMatch() {
+            const types = hand.map(c => c.type);
+            const nums = hand.map(c => c.num);
+            
+            const hasAllTypes = types.includes('bin') && types.includes('hex') && types.includes('dec');
+            const hasSameValue = nums[0] === nums[1] && nums[1] === nums[2];
+
+            if (hasAllTypes && hasSameValue) {
+                triggerScramble(true);
+            }
+        }
+
+        function triggerScramble(playerInitiated) {
+            if (gameState === 'scramble') return;
+            gameState = 'scramble';
+            clearBotTimers();
+            
+            DOM.status.innerText = "🚨 SCRAMBLE! GRAB A TOKEN! 🚨";
+            DOM.table.classList.add('scramble-flash');
+            DOM.btnGrab.style.display = 'block';
+            playSound('scramble');
+
+            if (!playerInitiated) {
+                // A bot got the match, remove one token immediately
+                tokensLeft--;
+                updateUI();
+            }
+
+            // Simulate remaining bots grabbing tokens
+            let grabDelay = 1500; // Time player has to react before next bot grabs
+            
+            const botGrabInterval = setInterval(() => {
+                if (gameState !== 'scramble') {
+                    clearInterval(botGrabInterval);
+                    return;
+                }
+                
+                tokensLeft--;
+                updateUI();
+                playSound('pass');
+
+                if (tokensLeft <= 0) {
+                    clearInterval(botGrabInterval);
+                    resolveRound(false); // Player failed to grab
+                }
+            }, grabDelay);
+
+            // Store interval so it can be cleared if player clicks grab
+            botTimers.push(botGrabInterval);
+        }
+
+        DOM.btnGrab.addEventListener('click', () => {
+            if (gameState !== 'scramble') return;
+            if (tokensLeft > 0) {
+                tokensLeft--;
+                updateUI();
+                resolveRound(true); // Player successfully grabbed
+            }
+        });
+
+        function resolveRound(playerSafe) {
+            gameState = 'resolution';
+            clearBotTimers();
+            DOM.table.classList.remove('scramble-flash');
+            DOM.btnGrab.style.display = 'none';
+            
+            if (playerSafe) {
+                DOM.status.innerText = "SAFE! YOU SECURED A TOKEN.";
+                DOM.status.style.color = "var(--neon-green)";
+                playSound('safe');
+                setTimeout(startRound, 2500);
+            } else {
+                strikes++;
+                DOM.status.innerText = "TOO SLOW! STRIKE ADDED.";
+                DOM.status.style.color = "var(--neon-red)";
+                playSound('strike');
+                updateUI();
+                
+                if (strikes >= 3) {
+                    setTimeout(() => {
+                        alert("FATAL ERROR: H-E-X Reached. Game Over!");
+                        strikes = 0;
+                        round = 1;
+                        startRound();
+                    }, 2000);
+                } else {
+                    setTimeout(startRound, 2500);
+                }
+            }
+        }
+
+        function startBotLogic() {
+            clearBotTimers();
+            // Simulate 3 bots. Each has a random chance to find a match between 15-30 seconds.
+            for (let i = 0; i < TOTAL_PLAYERS - 1; i++) {
+                const timer = setTimeout(() => {
+                    if (gameState === 'playing') {
+                        triggerScramble(false);
+                    }
+                }, Math.random() * 15000 + 15000); // 15 to 30 seconds
+                botTimers.push(timer);
+            }
+        }
+
+        function clearBotTimers() {
+            botTimers.forEach(t => clearTimeout(t));
+            botTimers.forEach(t => clearInterval(t));
+            botTimers = [];
+        }
+
+        function startRound() {
+            gameState = 'playing';
+            DOM.status.innerText = "WAITING FOR MATCH...";
+            DOM.status.style.color = "var(--neon-red)";
+            DOM.btnGrab.style.display = 'none';
+            DOM.table.classList.remove('scramble-flash');
+            
+            generateDeck();
+            tokensLeft = TOTAL_PLAYERS - 1; // Always one less token than players
+            hand = [getCard(), getCard(), getCard()];
+            incomingCard = getCard();
+            
+            if(strikes === 0 && round > 1) round = 1; // Reset check
+            else if (strikes > 0 || round > 1) round++;
+
+            updateUI();
+            startBotLogic();
+        }
+
+        // Initialize from modal
+        document.getElementById('btn-start').addEventListener('click', () => {
+            initAudio(); // Required to unlock audio on first interaction
+            document.getElementById('instructions-modal').style.display = 'none';
+            startRound();
+        });
+    </script>
+</body>
+</html>
